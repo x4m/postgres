@@ -643,7 +643,7 @@ gistSplitByKey(Relation r, Page page, IndexTuple *itup, int len,
 							  &IsNull);
 		gistdentryinit(giststate, attno, &(entryvec->vector[i]),
 					   datum, r, page, i,
-					   FALSE, IsNull);
+					   FALSE, IsNull, GistTupleIsLazy(itup[i-1]));
 		if (IsNull)
 			offNullTuples[nOffNullTuples++] = i;
 	}

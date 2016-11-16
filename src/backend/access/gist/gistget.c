@@ -197,7 +197,7 @@ gistindex_keytest(IndexScanDesc scan,
 
 			gistdentryinit(giststate, key->sk_attno - 1, &de,
 						   datum, r, page, offset,
-						   FALSE, isNull);
+						   FALSE, isNull, GistTupleIsLazy(tuple));
 
 			/*
 			 * Call the Consistent function to evaluate the test.  The
@@ -258,7 +258,7 @@ gistindex_keytest(IndexScanDesc scan,
 
 			gistdentryinit(giststate, key->sk_attno - 1, &de,
 						   datum, r, page, offset,
-						   FALSE, isNull);
+						   FALSE, isNull, GistTupleIsLazy(tuple));
 
 			/*
 			 * Call the Distance function to evaluate the distance.  The
@@ -422,7 +422,7 @@ gistScanPage(IndexScanDesc scan, GISTSearchItem *pageItem, double *myDistances,
 		if (!match)
 			continue;
 
-		if (tbm && GistPageIsLeaf(page))
+		if (tbm && (GistPageIsLeaf(page) || GistTupleIsLazy(it)))
 		{
 			/*
 			 * getbitmap scan, so just push heap tuple TIDs into the bitmap
@@ -431,7 +431,7 @@ gistScanPage(IndexScanDesc scan, GISTSearchItem *pageItem, double *myDistances,
 			tbm_add_tuples(tbm, &it->t_tid, 1, recheck);
 			(*ntids)++;
 		}
-		else if (scan->numberOfOrderBys == 0 && GistPageIsLeaf(page))
+		else if (scan->numberOfOrderBys == 0 && (GistPageIsLeaf(page) || GistTupleIsLazy(it)))
 		{
 			/*
 			 * Non-ordered scan, so report tuples in so->pageData[]
@@ -466,7 +466,7 @@ gistScanPage(IndexScanDesc scan, GISTSearchItem *pageItem, double *myDistances,
 			/* Create new GISTSearchItem for this item */
 			item = palloc(SizeOfGISTSearchItem(scan->numberOfOrderBys));
 
-			if (GistPageIsLeaf(page))
+			if ((GistPageIsLeaf(page) || GistTupleIsLazy(it)))
 			{
 				/* Creating heap-tuple GISTSearchItem */
 				item->blkno = InvalidBlockNumber;

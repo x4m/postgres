@@ -320,6 +320,7 @@ typedef struct
 #define  GistTupleIsInvalid(itup)	( ItemPointerGetOffsetNumber( &((itup)->t_tid) ) == TUPLE_IS_INVALID )
 #define  GistTupleSetValid(itup)	ItemPointerSetOffsetNumber( &((itup)->t_tid), TUPLE_IS_VALID )
 
+#define GistPageCanStoreLazy(page,itup) ((int) ((PageHeader) page)->pd_upper - (int) ((PageHeader) page)->pd_lower - IndexTupleSize(itup) > 1024)
 
 
 
@@ -435,6 +436,13 @@ extern void gistdoinsert(Relation r,
 			 IndexTuple itup,
 			 Size freespace,
 			 GISTSTATE *GISTstate);
+extern void gistdoinsertloop(Relation r,
+			 IndexTuple itup,
+			 Size freespace,
+			 GISTSTATE *GISTstate,
+			 GISTInsertStack *stack,
+			 GISTInsertState state,
+			 GISTInsertStack *nolazy);
 
 /* A List of these is returned from gistplacetopage() in *splitinfo */
 typedef struct
@@ -498,6 +506,7 @@ extern Buffer gistNewBuffer(Relation r);
 extern void gistfillbuffer(Page page, IndexTuple *itup, int len,
 			   OffsetNumber off);
 extern IndexTuple *gistextractpage(Page page, int *len /* out */ );
+extern IndexTuple *gistextractlazy(Page page, int *len /* out */ );
 extern IndexTuple *gistjoinvector(
 			   IndexTuple *itvec, int *len,
 			   IndexTuple *additvec, int addlen);
@@ -519,7 +528,7 @@ extern OffsetNumber gistchoose(Relation r, Page p,
 extern void GISTInitBuffer(Buffer b, uint32 f);
 extern void gistdentryinit(GISTSTATE *giststate, int nkey, GISTENTRY *e,
 			   Datum k, Relation r, Page pg, OffsetNumber o,
-			   bool l, bool isNull);
+			   bool l, bool isNull, bool lazy);
 
 extern float gistpenalty(GISTSTATE *giststate, int attno,
 			GISTENTRY *key1, bool isNull1,

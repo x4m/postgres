@@ -105,6 +105,45 @@ gistextractpage(Page page, int *len /* out */ )
 	return itvec;
 }
 
+
+IndexTuple *
+gistextractlazy(Page page, int *len /* out */ )
+{
+	OffsetNumber i,
+				maxoff;
+	IndexTuple *itvec;
+	OffsetNumber* itemNos;
+	//elog(WARNING,"extracting for push");
+
+	maxoff = PageGetMaxOffsetNumber(page);
+	*len = 0;
+	itvec = palloc(sizeof(IndexTuple) * maxoff);
+	itemNos = palloc(sizeof(OffsetNumber) * maxoff);
+	for (i = FirstOffsetNumber; i <= maxoff; i = OffsetNumberNext(i))
+	{
+		ItemId tid = PageGetItemId(page, i);
+		IndexTuple it = (IndexTuple) PageGetItem(page, tid);
+		if(GistTupleIsLazy(it))
+		{
+			//elog(WARNING,"extract item %d",i);
+			IndexTuple copy = palloc(tid->lp_len);
+			//elog(WARNING,"memmove",i);
+			memmove(copy,it,tid->lp_len);
+			//elog(WARNING,"offset %d to index %d",i,*len);
+			itemNos[*len] = i;
+			//elog(WARNING,"ptr",i);
+			itvec[*len] = copy;
+			*len = *len+1;
+			//elog(WARNING,"done",i);
+		}
+	}
+
+	//elog(WARNING,"deleting %d",*len);
+	PageIndexMultiDelete(page,itemNos,*len);
+
+	return itvec;
+}
+
 /*
  * join two vectors into one
  */
@@ -178,7 +217,7 @@ gistMakeUnionItVec(GISTSTATE *giststate, IndexTuple *itvec, int len,
 						   evec->vector + evec->n,
 						   datum,
 						   NULL, NULL, (OffsetNumber) 0,
-						   FALSE, IsNull);
+						   FALSE, IsNull, GistTupleIsLazy(itvec[j]));
 			evec->n++;
 		}
 
@@ -302,7 +341,7 @@ gistDeCompressAtt(GISTSTATE *giststate, Relation r, IndexTuple tuple, Page p,
 		datum = index_getattr(tuple, i + 1, giststate->tupdesc, &isnull[i]);
 		gistdentryinit(giststate, i, &attdata[i],
 					   datum, r, p, o,
-					   FALSE, isnull[i]);
+					   FALSE, isnull[i], GistTupleIsLazy(tuple));
 	}
 }
 
@@ -438,6 +477,9 @@ gistchoose(Relation r, Page p, IndexTuple it,	/* it has compressed entry */
 		bool		zero_penalty;
 		int			j;
 
+		if(GistTupleIsLazy(itup))
+			continue;
+
 		zero_penalty = true;
 
 		/* Loop over index attributes. */
@@ -450,7 +492,7 @@ gistchoose(Relation r, Page p, IndexTuple it,	/* it has compressed entry */
 			/* Compute penalty for this column. */
 			datum = index_getattr(itup, j + 1, giststate->tupdesc, &IsNull);
 			gistdentryinit(giststate, j, &entry, datum, r, p, i,
-						   FALSE, IsNull);
+						   FALSE, IsNull, GistTupleIsLazy(itup));
 			usize = gistpenalty(giststate, j, &entry, IsNull,
 								&identry[j], isnull[j]);
 			if (usize > 0)
@@ -542,7 +584,7 @@ gistchoose(Relation r, Page p, IndexTuple it,	/* it has compressed entry */
 void
 gistdentryinit(GISTSTATE *giststate, int nkey, GISTENTRY *e,
 			   Datum k, Relation r, Page pg, OffsetNumber o,
-			   bool l, bool isNull)
+			   bool l, bool isNull, bool lazy)
 {
 	if (!isNull)
 	{
@@ -557,9 +599,20 @@ gistdentryinit(GISTSTATE *giststate, int nkey, GISTENTRY *e,
 		if (dep != e)
 			gistentryinit(*e, dep->key, dep->rel, dep->page, dep->offset,
 						  dep->leafkey);
+		if(lazy)
+		{
+			dep->leafpage = false;
+		}
 	}
 	else
+	{
 		gistentryinit(*e, (Datum) 0, r, pg, o, l);
+
+		if(lazy)
+		{
+			e->leafpage = false;
+		}
+	}
 }
 
 IndexTuple

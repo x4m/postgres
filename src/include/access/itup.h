@@ -72,6 +72,11 @@ typedef IndexAttributeBitMapData *IndexAttributeBitMap;
 #define IndexTupleHasNulls(itup)	((((IndexTuple) (itup))->t_info & INDEX_NULL_MASK))
 #define IndexTupleHasVarwidths(itup) ((((IndexTuple) (itup))->t_info & INDEX_VAR_MASK))
 
+#define TUPLE_IS_LAZY		0x2000
+#define  GistTupleIsLazy(itup)		(((IndexTuple)itup)->t_info & TUPLE_IS_LAZY)
+#define  GistTupleSetLazy(itup)		do { ((IndexTuple)itup)->t_info = ((IndexTuple)itup)->t_info | TUPLE_IS_LAZY; } while(0)
+#define  GistTupleUnsetLazy(itup)	do { ((IndexTuple)itup)->t_info = ((IndexTuple)itup)->t_info & ~TUPLE_IS_LAZY; } while(0)
+
 
 /*
  * Takes an infomask as argument (primarily because this needs to be usable
