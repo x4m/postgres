@@ -61,6 +61,8 @@ typedef struct SlruSharedData
 
 	/* Number of buffers managed by this SLRU structure */
 	int			num_slots;
+	int			bank_size;
+	int			bank_mask;
 
 	/*
 	 * Arrays holding info for each buffer slot.  Page number is undefined
